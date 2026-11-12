@@ -12,7 +12,10 @@ const pin = readFileSync(`${root}/PIN`, 'utf8').trim()
 const vendored = readFileSync(`${root}/vendor/gateway/VENDORED_FROM`, 'utf8').trim()
 if (vendored !== pin) { console.error(`vendor/gateway is ${vendored}, PIN is ${pin}: run npm run vendor`); process.exit(2) }
 const filter = process.argv[2] ?? ''
-const files = readdirSync(`${root}/scenarios`).filter(f => f.endsWith('.ts') && f.includes(filter)).sort()
+// HARNESS_SKIP is a comma-separated list of name fragments to leave out, used by scripts/mutate.py
+// to skip the slow two-process scenario for planted faults it is not meant to catch.
+const skip = (process.env.HARNESS_SKIP ?? '').split(',').filter(Boolean)
+const files = readdirSync(`${root}/scenarios`).filter(f => f.endsWith('.ts') && f.includes(filter) && !skip.some(x => f.includes(x))).sort()
 const tsx = `${root}/node_modules/.bin/tsx`
 const summary: any[] = []
 let failed = 0

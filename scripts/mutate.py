@@ -6,7 +6,7 @@ A mutation is killed when the run fails and every scenario named for it is among
 The vendored source is hashed before and after, so a run that leaves a fault behind is reported.
 Usage: python3 scripts/mutate.py
 """
-import hashlib, json, pathlib, subprocess, sys
+import hashlib, json, os, pathlib, subprocess, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / 'vendor' / 'gateway' / 'src'
@@ -42,7 +42,12 @@ MUTATIONS = [
     ('M9 authority is not rechecked when a publish attempt is committed', PR + 'nano-publish.ts',
      "    const bad = attemptAuthorityViolation(db, row)\n", "    const bad: string | null = null\n",
      ['07-revocation-around-publish']),
+    ('M10 the send reservation does not take the write lock first', PR + 'wallet-ops.ts',
+     "    return { op: getOp(db, id)!, replay: false }\n  }).immediate()\n}\n\n/** Reserve a receive or open", "    return { op: getOp(db, id)!, replay: false }\n  })()\n}\n\n/** Reserve a receive or open",
+     ['10-two-process-race']),
 ]
+
+SLOW = '10-two-process-race'
 
 
 def tree_hash() -> str:
@@ -53,8 +58,9 @@ def tree_hash() -> str:
     return h.hexdigest()
 
 
-def run_attack() -> tuple[int, list[str]]:
-    r = subprocess.run(['npm', 'run', '-s', 'attack'], cwd=ROOT, capture_output=True, text=True)
+def run_attack(skip_slow: bool = False) -> tuple[int, list[str]]:
+    env = dict(os.environ, HARNESS_SKIP=SLOW) if skip_slow else dict(os.environ)
+    r = subprocess.run(['npm', 'run', '-s', 'attack'], cwd=ROOT, capture_output=True, text=True, env=env)
     failed = [l.split()[1] for l in r.stdout.splitlines() if l.startswith('FAIL ')]
     checks = sorted({l.strip()[2:].split(':')[0] for l in r.stdout.splitlines() if l.strip().startswith('x ')})
     run_attack.checks = checks
@@ -72,7 +78,7 @@ for name, rel, old, new, want in MUTATIONS:
         print(f'NOT PLANTED {name}: pattern found {n} times'); continue
     f.write_text(text.replace(old, new, 1))
     try:
-        code, failed = run_attack()
+        code, failed = run_attack(skip_slow=SLOW not in want)
     finally:
         f.write_text(text)
     killed = code != 0 and all(w in failed for w in want)

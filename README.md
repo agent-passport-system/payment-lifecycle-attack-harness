@@ -69,8 +69,9 @@ The harness checks three rules after every phase.
 | `07-revocation-around-publish` | Revocation before publication cancels the payment. After an attempt is committed, the reservation stays held |
 | `08-node-outage-during-publish` | The node fails before or after receiving a block. The gateway retains the reservation and retries only the stored block |
 | `09-crash-before-publish` | A process crashes before signing or after recording an attempt. Recovery does not create another block |
+| `10-two-process-race` | Two separate gateway processes on one database file fire at the same instant: same key, same wallet, shared budget, one payment to recover. Each race ends with one payment and one signed block |
 
-At publication, the author's run completed all 11 scenarios and detected all nine deliberately introduced faults. These are author-run results, not independent validation.
+The author's run completes all 12 scenarios and detects all ten deliberately introduced faults. These are author-run results, not independent validation.
 
 ## Known limitations
 
@@ -80,7 +81,9 @@ A faulty node can also stop new payments across tenants. This protects against u
 
 Operator resolutions record outside evidence, but the gateway does not independently authenticate the sources the operator names.
 
-The harness also does not test two gateway processes racing against the same database, the HTTP layer, real Nano consensus or proof-of-work validation. Scenarios `08` and `09` do not yet have their own planted mutations.
+The harness does not test the HTTP layer, real Nano consensus or proof-of-work validation. Scenarios `08` and `09` do not yet have their own planted mutations.
+
+The two-process scenario releases two processes at a shared wall-clock time on one machine, three rounds per race. That is twelve races, not a search of every interleaving. It does not cover more than two processes, processes on different machines, or a database on a network file system.
 
 See `ADAPTATIONS.md` for the differences between this test environment and the deployed gateway.
 
