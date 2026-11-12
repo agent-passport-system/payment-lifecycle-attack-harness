@@ -70,6 +70,7 @@ The harness checks three rules after every phase.
 | `08-node-outage-during-publish` | The node fails before or after receiving a block. The gateway retains the reservation and retries only the stored block |
 | `09-crash-before-publish` | A process crashes before signing or after recording an attempt. Recovery does not create another block |
 | `10-two-process-race` | Two separate gateway processes on one database file fire at the same instant: same key, same wallet, shared budget, one payment to recover. Each race ends with one payment and one signed block |
+| `11-many-process-stress` | Six gateway processes on one database file send random payments from six wallets under one shared budget, retry keys and take over each other's leases, and about a third are killed part-way. No budget is exceeded, counters match reservations, each payment has one block, and the node's balances match the confirmed payments |
 
 The author's run completes all 12 scenarios and detects all ten deliberately introduced faults. These are author-run results, not independent validation.
 
@@ -83,7 +84,9 @@ Operator resolutions record outside evidence, but the gateway does not independe
 
 The harness does not test the HTTP layer, real Nano consensus or proof-of-work validation. Scenarios `08` and `09` do not yet have their own planted mutations.
 
-The two-process scenario releases two processes at a shared wall-clock time on one machine, three rounds per race. That is twelve races, not a search of every interleaving. It does not cover more than two processes, processes on different machines, or a database on a network file system.
+The two-process scenario releases two processes at a shared wall-clock time on one machine, three rounds per race. That is twelve races, not a search of every interleaving.
+
+The stress scenario (`11`) runs six processes for eight rounds by default (`STRESS_ROUNDS` changes that). It is a random search on one machine: a pass says no fault was hit in that run. It is left out of the planted-fault runs in `scripts/mutate.py`. Neither scenario covers processes on different machines or a database on a network file system.
 
 See `ADAPTATIONS.md` for the differences between this test environment and the deployed gateway.
 
