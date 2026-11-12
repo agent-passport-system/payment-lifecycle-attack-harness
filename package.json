@@ -1,0 +1,15 @@
+{
+  "name": "payment-lifecycle-attack-harness",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Attack target for the Agent Passport gateway Nano payment lifecycle. Runs the gateway code at a pinned public commit against a scriptable fake node. Not a conformance result.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "vendor": "scripts/vendor-gateway.sh",
+    "attack": "tsx src/run-all.ts"
+  },
+  "devDependencies": {
+    "tsx": "4.23.0"
+  }
+}
