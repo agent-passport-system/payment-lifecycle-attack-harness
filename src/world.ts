@@ -11,6 +11,7 @@ import { startNanoLifecycle, type LifecycleHandle } from '../vendor/gateway/src/
 import { initializeWalletFrontier } from '../vendor/gateway/src/payment-rails/wallet-frontier.js'
 import { getOp, type WalletOp } from '../vendor/gateway/src/payment-rails/wallet-ops.js'
 import { FakeLedger } from './fake-node.js'
+import { rpcNode } from '../vendor/gateway/src/payment-rails/nano-publish.js'
 import { nano } from './deps.js'
 
 export const LEASE_MS = 30_000
@@ -51,16 +52,21 @@ function operatorEnv(): void {
   process.env.NANO_PILOT_MAX_PAYMENTS = '100000'
 }
 
-export async function openWorld(dir: string, opts: { owner: string; clockStart?: number }): Promise<World> {
+/**
+ * `racer` opens a second gateway process on a database another process already set up. It talks to
+ * the fake node over HTTP through the gateway's own RPC client, and it never writes meta.json or
+ * the ledger file, which belong to the process that started it.
+ */
+export async function openWorld(dir: string, opts: { owner: string; clockStart?: number; racer?: { nodeUrl: string } }): Promise<World> {
   operatorEnv()
   const metaPath = `${dir}/meta.json`
   const meta: Meta = existsSync(metaPath) ? JSON.parse(readFileSync(metaPath, 'utf8')) : { clock: opts.clockStart ?? 1_000_000, seats: [], ops: [] }
   let now = meta.clock
   const clock = { now: () => now, advance: (ms: number) => { now += ms; meta.clock = now } }
   const db = initDB(`${dir}/gateway.db`)
-  const ledger = new FakeLedger(`${dir}/ledger.json`)
+  const ledger = new FakeLedger(opts.racer ? null : `${dir}/ledger.json`)
   const ctx: RunContext = {
-    node: ledger.node, owner: opts.owner, leaseMs: LEASE_MS, now: clock.now,
+    node: opts.racer ? rpcNode(opts.racer.nodeUrl) : ledger.node, owner: opts.owner, leaseMs: LEASE_MS, now: clock.now,
     // Production derives the key from the master seed by wallet index (seedSigner). Same checks here.
     signer: (op) => {
       const w = db.prepare(`SELECT wallet_index, nano_address FROM agent_wallets WHERE id = ?`).get(op.wallet_id) as any
@@ -80,7 +86,7 @@ export async function openWorld(dir: string, opts: { owner: string; clockStart?:
   const w: World = {
     db, ledger, clock, lifecycle, meta, dir,
     tick: () => lifecycle.tickNow(),
-    saveMeta: () => writeFileSync(metaPath, JSON.stringify(meta, null, 1)),
+    saveMeta: () => { if (!opts.racer) writeFileSync(metaPath, JSON.stringify(meta, null, 1)) },
     op: (id) => getOp(db, id)!,
     seat({ limitRaw = '5000', balanceRaw = '100000' } = {}) {
       const t = meta.seats.length + 1
