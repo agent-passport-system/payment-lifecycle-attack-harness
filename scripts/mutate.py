@@ -47,7 +47,9 @@ MUTATIONS = [
      ['10-two-process-race']),
 ]
 
-SLOW = '10-two-process-race'
+# Scenarios too slow to rerun for every planted fault. A mutation that names one of them in its
+# expected killers runs without the skip, so scenario 10 keeps catching M10 the way it did.
+SLOW = ['10-two-process-race', '14-cross-process-idempotency']
 # The stress scenario is a random search. It is left out of every planted-fault run, so a chance
 # failure there is never counted as a kill. The clean rerun at the end still runs it.
 STRESS = '11-many-process-stress'
@@ -62,7 +64,7 @@ def tree_hash() -> str:
 
 
 def run_attack(skip_slow: bool = False, skip_stress: bool = False) -> tuple[int, list[str]]:
-    skip = [name for name, on in ((SLOW, skip_slow), (STRESS, skip_stress)) if on]
+    skip = [name for name, on in ((','.join(SLOW), skip_slow), (STRESS, skip_stress)) if on]
     env = dict(os.environ, HARNESS_SKIP=','.join(skip)) if skip else dict(os.environ)
     r = subprocess.run(['npm', 'run', '-s', 'attack'], cwd=ROOT, capture_output=True, text=True, env=env)
     failed = [l.split()[1] for l in r.stdout.splitlines() if l.startswith('FAIL ')]
@@ -82,7 +84,7 @@ for name, rel, old, new, want in MUTATIONS:
         print(f'NOT PLANTED {name}: pattern found {n} times'); continue
     f.write_text(text.replace(old, new, 1))
     try:
-        code, failed = run_attack(skip_slow=SLOW not in want, skip_stress=True)
+        code, failed = run_attack(skip_slow=not any(x in want for x in SLOW), skip_stress=True)
     finally:
         f.write_text(text)
     killed = code != 0 and all(w in failed for w in want)

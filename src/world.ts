@@ -37,7 +37,7 @@ export interface World {
   seat(opts?: { limitRaw?: string; balanceRaw?: string }): Seat
   /** A second paying agent in the same tenant, with its own wallet, under the same top delegation as `of`. */
   sibling(of: Seat, opts?: { limitRaw?: string; balanceRaw?: string }): Seat
-  send(seat: Seat, key: string, amountRaw: string): Promise<{ op?: WalletOp; denied?: string; notReady?: string }>
+  send(seat: Seat, key: string, amountRaw: string, toAddress?: string): Promise<{ op?: WalletOp; denied?: string; notReady?: string }>
   op(id: string): WalletOp
   saveMeta(): void
 }
@@ -132,10 +132,10 @@ export async function openWorld(dir: string, opts: { owner: string; clockStart?:
     },
     // The route's path without HTTP: reserveSendOp with the installed runner's claim and readiness,
     // then schedule, as POST /wallets/send does. Then wait for the scheduled run to finish.
-    async send(seat, key, amountRaw) {
+    async send(seat, key, amountRaw, toAddress = DEST.address) {
       const runner: any = getOpRunner()
       const r = await getWalletService().reserveSendOp({
-        tenantId: seat.tenant, fromAgentId: seat.agent, toAddress: DEST.address, amountRaw, idempotencyKey: key,
+        tenantId: seat.tenant, fromAgentId: seat.agent, toAddress, amountRaw, idempotencyKey: key,
         claim: { owner: runner.owner, now: runner.now(), leaseMs: runner.leaseMs }, notReady: runner.readiness(),
       })
       if ('denied' in r) return { denied: r.denied.denial_reason ?? 'denied', notReady: r.notReady }
